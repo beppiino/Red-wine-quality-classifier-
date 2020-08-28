@@ -51,11 +51,6 @@ y = wine_data['quality']
 sc = StandardScaler()
 X = sc.fit_transform(X)
 
-
-
-# esegue sovracampionamento usando SMOTE
-
-
 #principal component analysis
 from sklearn.decomposition import PCA
 pca = PCA()
@@ -71,8 +66,8 @@ plt.title('PCA Analysis')
 plt.plot(var, 'ro-')
 plt.grid()
 
-#As per the graph, we can see that 8 principal components attribute for 90% of variation in the data. 
-#we shall pick the first 8 components for our prediction.
+
+# pick the first 8 components (90% of variance) for our prediction.
 pca_new = PCA(n_components=8)
 X_new = pca_new.fit_transform(X)
 print(X_new)
@@ -81,10 +76,10 @@ print(wine_data['quality'].value_counts())
 # Splitting the data
 X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size=.25, random_state=0)
 
+#oversampling
 from imblearn.over_sampling import SMOTE
 sm = SMOTE(random_state = 42)
 
-#sovracampionamento casuale
 X_train_res, y_train_res = sm.fit_resample(X_train, y_train.ravel())
 
 print("Class 1 numbers: " , len(y_train_res[y_train_res=="bad"]))
