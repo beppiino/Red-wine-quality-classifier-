@@ -15,11 +15,9 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import AdaBoostClassifier
-#import the dataset
 
 
 wine_data = pd.read_csv("C:/Users/user/Desktop/input/winequality-red.csv")
-print(wine_data['quality'].value_counts())
 group_names = ['bad', 'good']
 
 def plot_results(classifier,X_test,y_test, name):
@@ -28,20 +26,61 @@ def plot_results(classifier,X_test,y_test, name):
     print(classification_report(y_test, pred)) 
     cm = confusion_matrix(y_test, pred, group_names)
     ax= plt.subplot()
-    sns.heatmap(cm, annot=True, ax = ax, fmt='g', cmap="Reds"); #annot=True to annotate cells
+    sns.heatmap(cm, annot=True, ax = ax, fmt='g', cmap="Reds"); 
 
     ax.set_xlabel('Predicted labels');ax.set_ylabel('True labels'); 
     ax.set_title(name); 
     ax.xaxis.set_ticklabels(group_names); ax.yaxis.set_ticklabels(group_names);
     plt.show()
 
+#plot the boxplot for visualization of correlation 
+def plot(x_value, y_value):
+    fig, ax = plt.subplots(figsize=(7, 6))
+    sns.boxplot(x= x_value, y= y_value, data=wine_data,  palette='RdBu_r')
+    
 
+#segment data in two bins 
+#bad ==> 1, 2, 3 ,4 , 5, 
+#good ==>6, 7, 8, 9, 10
+def manipulate_data(): 
+    bins = (2, 5.5, 8)
+    wine_data['quality'] = pd.cut(wine_data['quality'], bins = bins, labels = group_names)
+    return wine_data
 
+#import the dataset
+wine_data = pd.read_csv("C:/Users/user/Desktop/input/winequality-red.csv")
+print(wine_data['quality'].value_counts())
 
-#preprocessing
-bins = (2, 6.5, 8)
-wine_data['quality'] = pd.cut(wine_data['quality'], bins = bins, labels = group_names)
+# %%% dataset visualitazion %%%% 
+print('Number of rows in the dataset: ', wine_data.shape[0])
+print('Number of columns in the dataset: ', wine_data.shape[1])
+print(wine_data.isnull().sum())
+wine_data.describe()
+wine_data['quality'].unique()
+sns.countplot(wine_data['quality'], palette='RdBu_r')
 
+#data correlation
+plot('quality', 'fixed acidity')
+plot('quality', 'volatile acidity')
+plot('quality', 'citric acid')
+plot('quality', 'residual sugar')
+plot('quality', 'chlorides')
+plot('quality', 'free sulfur dioxide')
+plot('quality', 'sulphates')
+plot('quality', 'alcohol')
+correlations = wine_data.corr()['quality'].drop('quality')
+print(correlations)
+plt.figure(figsize=(12,8))
+corr = wine_data.corr()
+mask = np.zeros_like(corr, dtype=np.bool)
+mask[np.triu_indices_from(mask)] = True
+sns.heatmap(corr,mask=mask, annot=True, linewidths=1, cmap='RdBu_r')
+plt.show()
+
+# %%% preprocessing %%%
+manipulate_data()
+sns.countplot(x='quality', data=wine_data, palette='RdBu_r')
+plt.show()
 
 #subset x with all feature without 'quality' and subset y with feature quality
 X = wine_data.iloc[:,:11]
@@ -66,31 +105,22 @@ plt.title('PCA Analysis')
 plt.plot(var, 'ro-')
 plt.grid()
 
-
-# pick the first 8 components (90% of variance) for our prediction.
+#As per the graph,there are 8 principal components for 90% of variation in the data. 
+#pick the first 8 components for prediction.
 pca_new = PCA(n_components=8)
 X_new = pca_new.fit_transform(X)
-print(X_new)
-
 print(wine_data['quality'].value_counts())
+
 # Splitting the data
 X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size=.25, random_state=0)
-
-#oversampling
-from imblearn.over_sampling import SMOTE
-sm = SMOTE(random_state = 42)
-
-X_train_res, y_train_res = sm.fit_resample(X_train, y_train.ravel())
-
-print("Class 1 numbers: " , len(y_train_res[y_train_res=="bad"]))
-print("Class 2 numbers: " , len(y_train_res[y_train_res=="good"]))
-
-
-print("Shape of X_train: ",X_train_res.shape)
+print("Shape of X_train: ",X_train.shape)
 print("Shape of X_test: ", X_test.shape)
-print("Shape of y_train: ",y_train_res.shape)
+print("Shape of y_train: ",y_train.shape)
 print("Shape of y_test",y_test.shape)
 
+
+
+# %%% Classification %%%%
 
 # Support Vector Machines
 # defining parameter range 
@@ -99,7 +129,7 @@ param_grid = {'C': [0.1, 1, 10, 100, 1000],
               'kernel': ['rbf', 'sigmoid']}
 
 grid_svm = GridSearchCV(SVC(), param_grid=param_grid, cv=5, refit = True, verbose = False) 
-grid_svm.fit(X_train_res, y_train_res) 
+grid_svm.fit(X_train, y_train) 
 print("best_params", grid_svm.best_params_) 
 print("best_estimator", grid_svm.best_estimator_) 
 plot_results(grid_svm, X_test, y_test,'Support Vector Machines')
@@ -109,12 +139,12 @@ plot_results(grid_svm, X_test, y_test,'Support Vector Machines')
 rf=RandomForestClassifier(random_state=42)
 param_grid = { 
     'n_estimators': [100, 250, 500],
-    'max_features': ['auto', None, 'log2'],
+    'max_features': ['auto', 'log2'],
     'criterion' :['gini', 'entropy']
 }
 
 grid_rf = GridSearchCV(estimator=rf, param_grid=param_grid, cv= 5, refit = True, verbose = False)
-grid_rf.fit(X_train_res, y_train_res)
+grid_rf.fit(X_train, y_train)
 
 print("best_params", grid_rf.best_params_) 
 print("best_estimator", grid_rf.best_estimator_) 
@@ -124,25 +154,23 @@ plot_results(grid_rf, X_test, y_test,'Random Forest')
 knn = KNeighborsClassifier()
 param_grid = {'n_neighbors':[1,4,5,6,7,8],
               'leaf_size':[1,3,5,10],
-              'algorithm':['auto', 'kd_tree'],
-              'n_jobs':[-1]}
+}
 
 grid_knn = GridSearchCV(knn, param_grid=param_grid)
-grid_knn.fit(X_train_res ,y_train_res)
+grid_knn.fit(X_train ,y_train)
 
 print("best_params", grid_knn.best_params_) 
 print("best_estimator", grid_knn.best_estimator_) 
 plot_results(grid_knn, X_test, y_test,'K-nearest neighbors')
 
 # AdaBoost
-
 Ada = AdaBoostClassifier(random_state=1)
-Ada.fit(X_train_res, y_train_res)
+Ada.fit(X_train, y_train)
 plot_results(Ada, X_test, y_test,'AdaBoost')
 
 
 #Gaussian Naive Bayes
 gaussian = GaussianNB()
-gaussian.fit(X_train_res, y_train_res)
+gaussian.fit(X_train, y_train)
 plot_results(gaussian, X_test, y_test,'Gaussian Naive Bayes')
 
